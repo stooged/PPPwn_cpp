@@ -40,7 +40,7 @@ static void signal_handler(int sig_num) {
 std::vector<uint8_t> readBinary(const std::string &filename) {
     std::ifstream file(filename, std::ios::binary | std::ios::ate);
     if (!file) {
-        //std::cout << "[-] Cannot open: " << filename << std::endl;
+        std::cout << "[-] Cannot open: " << filename << std::endl;
         return {};
     }
 
@@ -49,7 +49,7 @@ std::vector<uint8_t> readBinary(const std::string &filename) {
 
     std::vector<uint8_t> buffer(size);
     if (!file.read(reinterpret_cast<char *>(buffer.data()), size)) {
-        //std::cout << "[-] Cannot read: " << filename << std::endl;
+        std::cout << "[-] Cannot read: " << filename << std::endl;
         return {};
     }
 
@@ -73,10 +73,10 @@ void startExploit(const std::string &interface, enum FirmwareVersion fw,
 }
 
 void listInterfaces() {
-    //std::cout << "[+] interfaces: " << std::endl;
+    std::cout << "[+] interfaces: " << std::endl;
     std::vector<pcpp::PcapLiveDevice *> devList = pcpp::PcapLiveDeviceList::getInstance().getPcapLiveDevicesList();
     for (pcpp::PcapLiveDevice *dev: devList) {
-        //std::cout << "\t" << dev->getName() << " " << dev->getDesc() << std::endl;
+        std::cout << "\t" << dev->getName() << " " << dev->getDesc() << std::endl;
     }
     exit(0);
 }
@@ -103,7 +103,7 @@ enum FirmwareVersion getFirmwareOffset(int fw) {
             {1050, FIRMWARE_1050_1071},
             {1070, FIRMWARE_1050_1071},
             {1071, FIRMWARE_1050_1071},
-            {1100, FIRMWARE_1100}
+            {1100, FIRMWARE_1100}	
     };
     if (fw_choices.count(fw) == 0) return FIRMWARE_UNKNOWN;
     return fw_choices[fw];
@@ -111,7 +111,7 @@ enum FirmwareVersion getFirmwareOffset(int fw) {
 
 int main(int argc, char *argv[]) {
     using namespace clipp;
-    //std::cout << "[+] PPPwn++ - PlayStation 4 PPPoE RCE by theflow" << std::endl;
+    std::cout << "[+] PPPwn++ - PlayStation 4 PPPoE RCE by theflow" << std::endl;
     std::string interface, stage1 = "stage1_11.00.bin", stage2 = "stage2_11.00.bin";
     int fw = 1100;
     bool retry = false;
@@ -129,19 +129,19 @@ int main(int argc, char *argv[]) {
 
     auto result = parse(argc, argv, cli);
     if (!result) {
-        //std::cout << make_man_page(cli, "pppwn");
+        std::cout << make_man_page(cli, "pppwn");
         return 1;
     }
 
     auto offset = getFirmwareOffset(fw);
     if (offset == FIRMWARE_UNKNOWN) {
-        //std::cerr << "[-] Invalid firmware version" << std::endl;
-        //std::cout << make_man_page(cli, "pppwn");
+        std::cout << "[-] Invalid firmware version" << std::endl;
+        std::cout << make_man_page(cli, "pppwn");
         return 1;
     }
 
-    //std::cout << "[+] args: interface=" << interface << " fw=" << fw << " stage1=" << stage1 << " stage2=" << stage2
-             // << " auto-retry=" << (retry ? "on" : "off") << std::endl;
+    std::cout << "[+] args: interface=" << interface << " fw=" << fw << " stage1=" << stage1 << " stage2=" << stage2
+              << " auto-retry=" << (retry ? "on" : "off") << std::endl;
 
 #ifdef _WIN32
     // todo run LcpEchoHandler
@@ -151,7 +151,7 @@ int main(int argc, char *argv[]) {
 #else
     pid = fork();
     if (pid < 0) {
-        //std::cerr << "[-] Cannot run LcpEchoHandler" << std::endl;
+        std::cout << "[-] Cannot run LcpEchoHandler" << std::endl;
     } else if (pid == 0) {
         LcpEchoHandler lcp_echo_handler(interface);
         lcp_echo_handler.run();

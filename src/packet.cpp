@@ -31,10 +31,10 @@
 #define PPP_IPCP_Option_IP 0x03
 
 const static std::string SOURCE_MAC = "41:41:41:41:41:41";
-const static std::string SOURCE_IPV4 = "41.41.41.41";
+const static std::string SOURCE_IPV4 = "192.168.2.1";
 const static std::string SOURCE_IPV6 = "fe80::4141:4141:4141:4141";
 
-const static std::string TARGET_IPV4 = "42.42.42.42";
+const static std::string TARGET_IPV4 = "192.168.2.2";
 
 const static std::string BPF_FILTER = "(ip6) || (pppoed) || (pppoes && !ip)";
 
