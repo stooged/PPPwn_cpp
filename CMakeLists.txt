@@ -2,7 +2,6 @@ cmake_minimum_required(VERSION 3.12)
 include(CMakeDependentOption)
 set(APP_BUILD_OPTIONS)
 set(APP_LINK_LIB)
-set(CLI_LINK_LIB)
 
 # Zig makes cross-compiling easier and ignores glibc version issue
 # target can be: x86_64-macos-none, x86_64-macos.11.0-none, x86_64-windows-gnu, mipsel-linux-musl, x86_64-linux-gnu.2.17, ...
@@ -32,8 +31,11 @@ if (ZIG_TARGET)
 endif ()
 
 if (CMAKE_BUILD_TYPE STREQUAL Debug)
-    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fsanitize=address,undefined")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fsanitize=address,undefined")
     list(APPEND APP_BUILD_OPTIONS -DDEBUG)
+else ()
+    # Remove prefix path in log for release build
+    add_compile_options(-fmacro-prefix-map=${CMAKE_SOURCE_DIR}/=/)
 endif ()
 
 project(pppwn)
@@ -41,9 +43,8 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_EXTENSIONS ON)
 if (MINGW)
     set(CMAKE_EXE_LINKER_FLAGS "-static-libgcc -static-libstdc++ -static" CACHE STRING "" FORCE)
-    add_compile_definitions(-D_Post_invalid_=) # Fix incompatibility with old npcap
-    add_compile_options("-Wno-macro-redefined" "-Wno-implicit-function-declaration")
-    list(APPEND CLI_LINK_LIB winmm)
+    add_compile_definitions(_Post_invalid_=) # Fix incompatibility with old npcap
+    list(APPEND APP_LINK_LIB winmm)
 endif ()
 
 if (USE_SYSTEM_PCAPPLUSPLUS)
@@ -52,13 +53,15 @@ if (USE_SYSTEM_PCAPPLUSPLUS)
 else ()
     set(CMAKE_POLICY_DEFAULT_CMP0077 NEW)
     set(BUILD_SHARED_LIBS OFF)
-    if(NOT USE_SYSTEM_PCAP)
-        if (MINGW)
-            # Fix a pcap CMakeLists bug
-            set(BUILD_SHARED_LIBS ON)
-            # Fix zig cross-compiling issue
-            set(CMAKE_USE_PTHREADS_INIT ON)
-        endif ()
+    set(PPPWN_PCAP_DIRECTION ON)
+    if (MINGW)
+        # Fix a pcap CMakeLists bug
+        set(BUILD_SHARED_LIBS ON)
+        # Fix zig cross-compiling issue
+        set(CMAKE_USE_PTHREADS_INIT ON)
+        set(PPPWN_PCAP_DIRECTION OFF)
+    endif ()
+    if (NOT USE_SYSTEM_PCAP)
         include(FetchContent)
         set(DISABLE_DBUS ON)
         set(DISABLE_RDMA ON)
@@ -75,17 +78,21 @@ else ()
         target_link_libraries(PCAP::PCAP INTERFACE pcap_static)
         target_include_directories(PCAP::PCAP INTERFACE "${PCAP_INCLUDE_DIR}")
         target_compile_definitions(PCAP::PCAP INTERFACE "_BSD_SOURCE" "_DEFAULT_SOURCE")
+        target_compile_options(pcap_static PRIVATE "-Wno-macro-redefined" "-Wno-implicit-function-declaration")
         set(PCAP_NEEDS_THREADS ON)
         set(HAVE_PCAP_IMMEDIATE_MODE ON)
         set(HAVE_PCAP_DIRECTION ON)
     endif ()
     set(BUILD_SHARED_LIBS OFF)
-    set(PCAPPP_ENABLE_PCAP_SET_DIRECTION ON)
+    set(PCAPPP_ENABLE_PCAP_SET_DIRECTION ${PPPWN_PCAP_DIRECTION})
     set(PCAPPP_ENABLE_PCAP_IMMEDIATE_MODE ON)
     include(FetchContent)
     FetchContent_Declare(PcapPlusPlus GIT_REPOSITORY https://github.com/seladb/PcapPlusPlus.git
             GIT_TAG v23.09)
     FetchContent_MakeAvailable(PcapPlusPlus)
+    set_property(TARGET Packet++ PROPERTY COMPILE_WARNING_AS_ERROR OFF)
+    set_property(TARGET Pcap++ PROPERTY COMPILE_WARNING_AS_ERROR OFF)
+    set_property(TARGET Common++ PROPERTY COMPILE_WARNING_AS_ERROR OFF)
     list(APPEND APP_LINK_LIB Pcap++)
 endif ()
 
@@ -96,8 +103,30 @@ target_compile_options(${PROJECT_NAME}_static PUBLIC ${APP_BUILD_OPTIONS})
 target_include_directories(${PROJECT_NAME}_static PUBLIC include)
 
 if (BUILD_CLI)
-    add_executable(${PROJECT_NAME} src/main.cpp)
-    target_link_libraries(${PROJECT_NAME} PRIVATE ${PROJECT_NAME}_static ${CLI_LINK_LIB})
+    include(FetchContent)
+    FetchContent_Declare(clipp GIT_REPOSITORY https://github.com/muellan/clipp.git
+            GIT_TAG v1.2.3)
+    FetchContent_MakeAvailable(clipp)
+
+    FetchContent_Declare(mongoose GIT_REPOSITORY https://github.com/cesanta/mongoose.git
+            GIT_TAG 7.14)
+    FetchContent_MakeAvailable(mongoose)
+
+    add_library(mongoose STATIC ${mongoose_SOURCE_DIR}/mongoose.c)
+    target_compile_options(mongoose PUBLIC -DMG_ENABLE_PACKED_FS=1)
+    target_include_directories(mongoose PUBLIC ${mongoose_SOURCE_DIR})
+
+    add_custom_command(
+            OUTPUT ${CMAKE_BINARY_DIR}/static.c
+            WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+            COMMAND ${ZIG} cc -o ${CMAKE_BINARY_DIR}/pack ${mongoose_SOURCE_DIR}/test/pack.c
+            COMMAND ${CMAKE_BINARY_DIR}/pack web/*.html web/*.ttf > ${CMAKE_BINARY_DIR}/static.c
+            DEPENDS web/index.html
+    )
+
+    add_executable(${PROJECT_NAME} src/main.cpp src/web.cpp ${mongoose_SOURCE_DIR}/mongoose.c ${CMAKE_BINARY_DIR}/static.c)
+    target_include_directories(${PROJECT_NAME} PRIVATE ${clipp_SOURCE_DIR}/include ${mongoose_SOURCE_DIR})
+    target_link_libraries(${PROJECT_NAME} PRIVATE ${PROJECT_NAME}_static mongoose)
 endif ()
 
 if (BUILD_TEST)

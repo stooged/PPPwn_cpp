@@ -43,10 +43,14 @@
 
 #define CR0_ORI CR0_PG | CR0_AM | CR0_WP | CR0_NE | CR0_ET | CR0_TS | CR0_MP | CR0_PE
 
+#undef VM_PROT_READ
 #define VM_PROT_READ 0x01
+#undef VM_PROT_WRITE
 #define VM_PROT_WRITE 0x02
+#undef VM_PROT_EXECUTE
 #define VM_PROT_EXECUTE 0x04
 
+#undef VM_PROT_ALL
 #define VM_PROT_ALL (VM_PROT_READ | VM_PROT_WRITE | VM_PROT_EXECUTE)
 
 #define LLE_STATIC 0x0002
@@ -68,6 +72,7 @@
 
 #define CALLOUT_RETURNUNLOCKED 0x10
 
+#undef AF_INET6
 #define AF_INET6 28
 
 #define IFT_ETHER 0x6
