@@ -94,6 +94,17 @@ else ()
     set_property(TARGET Pcap++ PROPERTY COMPILE_WARNING_AS_ERROR OFF)
     set_property(TARGET Common++ PROPERTY COMPILE_WARNING_AS_ERROR OFF)
     list(APPEND APP_LINK_LIB Pcap++)
+    set(ZIG_BE "mips" "mips64" "armeb" "powerpc64" "powerpc" "aarch64_be" "s390x")
+    list(FIND ZIG_BE "${ZIG_TARGET_ARCH}" INDEX)
+    if (${INDEX} GREATER -1)
+        message(STATUS "Patching Layer.h to support big endian when cross-compiling")
+        add_custom_target(PatchLayer
+                WORKING_DIRECTORY ${PcapPlusPlus_SOURCE_DIR}
+                COMMAND git checkout -- ${PcapPlusPlus_SOURCE_DIR}/Packet++/header/Layer.h
+                COMMAND git apply --stat --apply ${CMAKE_SOURCE_DIR}/endian.patch
+        )
+        add_dependencies(Packet++ PatchLayer)
+    endif ()
 endif ()
 
 add_library(${PROJECT_NAME}_static STATIC src/exploit.cpp src/packet.cpp)
@@ -108,25 +119,9 @@ if (BUILD_CLI)
             GIT_TAG v1.2.3)
     FetchContent_MakeAvailable(clipp)
 
-    FetchContent_Declare(mongoose GIT_REPOSITORY https://github.com/cesanta/mongoose.git
-            GIT_TAG 7.14)
-    FetchContent_MakeAvailable(mongoose)
-
-    add_library(mongoose STATIC ${mongoose_SOURCE_DIR}/mongoose.c)
-    target_compile_options(mongoose PUBLIC -DMG_ENABLE_PACKED_FS=1)
-    target_include_directories(mongoose PUBLIC ${mongoose_SOURCE_DIR})
-
-    add_custom_command(
-            OUTPUT ${CMAKE_BINARY_DIR}/static.c
-            WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
-            COMMAND ${ZIG} cc -o ${CMAKE_BINARY_DIR}/pack ${mongoose_SOURCE_DIR}/test/pack.c
-            COMMAND ${CMAKE_BINARY_DIR}/pack web/*.html web/*.ttf > ${CMAKE_BINARY_DIR}/static.c
-            DEPENDS web/index.html
-    )
-
-    add_executable(${PROJECT_NAME} src/main.cpp src/web.cpp ${mongoose_SOURCE_DIR}/mongoose.c ${CMAKE_BINARY_DIR}/static.c)
-    target_include_directories(${PROJECT_NAME} PRIVATE ${clipp_SOURCE_DIR}/include ${mongoose_SOURCE_DIR})
-    target_link_libraries(${PROJECT_NAME} PRIVATE ${PROJECT_NAME}_static mongoose)
+    add_executable(${PROJECT_NAME} src/main.cpp)
+    target_include_directories(${PROJECT_NAME} PRIVATE ${clipp_SOURCE_DIR}/include)
+    target_link_libraries(${PROJECT_NAME} PRIVATE ${PROJECT_NAME}_static)
 endif ()
 
 if (BUILD_TEST)

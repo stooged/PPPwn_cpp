@@ -5,6 +5,7 @@
 #include <string>
 #include <PcapLiveDeviceList.h>
 #include <clipp.h>
+#include <signal.h>
 
 #if defined(__APPLE__)
 
@@ -13,26 +14,6 @@
 #endif
 
 #include "exploit.h"
-#include "web.h"
-
-std::vector<uint8_t> readBinary(const std::string &filename) {
-    std::ifstream file(filename, std::ios::binary | std::ios::ate);
-    if (!file) {
-        std::cout << "[-] Cannot open: " << filename << std::endl;
-        return {};
-    }
-
-    std::streamsize size = file.tellg();
-    file.seekg(0, std::ios::beg);
-
-    std::vector<uint8_t> buffer(size);
-    if (!file.read(reinterpret_cast<char *>(buffer.data()), size)) {
-        std::cout << "[-] Cannot read: " << filename << std::endl;
-        return {};
-    }
-
-    return buffer;
-}
 
 void listInterfaces() {
     std::cout << "[+] interfaces: " << std::endl;
@@ -103,11 +84,9 @@ enum FirmwareVersion getFirmwareOffset(int fw) {
 #define SUPPORTED_FIRMWARE "{700,701,702,750,751,755,800,801,803,850,852,900,903,904,950,951,960,1000,1001,1050,1070,1071,1100} (default: 1100)"
 
 static std::shared_ptr<Exploit> exploit = std::make_shared<Exploit>();
-static std::shared_ptr<WebPage> web = nullptr;
 
 static void signal_handler(int sig_num) {
     signal(sig_num, signal_handler);
-    if (web) web->stop();
     exploit->ppp_byebye();
     exit(sig_num);
 }
@@ -115,8 +94,7 @@ static void signal_handler(int sig_num) {
 int main(int argc, char *argv[]) {
     using namespace clipp;
     std::cout << "[+] PPPwn++ - PlayStation 4 PPPoE RCE by theflow" << std::endl;
-    std::string interface, stage1 = "stage1_11.00.bin", stage2 = "stage2_11.00.bin";
-    std::string web_url = "0.0.0.0:7796";
+    std::string interface;
     int fw = 1100;
     int timeout = 0;
     int wait_after_pin = 1;
@@ -124,14 +102,11 @@ int main(int argc, char *argv[]) {
     int buffer_size = 0;
     bool retry = false;
     bool no_wait_padi = false;
-    bool web_page = false;
     bool real_sleep = false;
 
     auto cli = (
             ("network interface" % required("-i", "--interface") & value("interface", interface), \
             SUPPORTED_FIRMWARE % option("--fw") & integer("fw", fw), \
-            "stage1 binary (default: stage1_11.00.bin)" % option("-s1", "--stage1") & value("STAGE1", stage1), \
-            "stage2 binary (default: stage2_11.00.bin)" % option("-s2", "--stage2") & value("STAGE2", stage2), \
             "timeout in seconds for ps4 response, 0 means always wait (default: 0)" %
             option("-t", "--timeout") & integer("seconds", timeout), \
             "Waiting time in seconds after the first round CPU pinning (default: 1)" %
@@ -143,9 +118,7 @@ int main(int argc, char *argv[]) {
             "automatically retry when fails or timeout" % option("-a", "--auto-retry").set(retry), \
             "don't wait one more PADI before starting" % option("-nw", "--no-wait-padi").set(no_wait_padi), \
             "Use CPU for more precise sleep time (Only used when execution speed is too slow)" %
-            option("-rs", "--real-sleep").set(real_sleep), \
-            "start a web page" % option("--web").set(web_page), \
-            "url" % option("--url") & value("url", web_url)
+            option("-rs", "--real-sleep").set(real_sleep)
             ) | \
             "list interfaces" % command("list").call(listInterfaces)
     );
@@ -163,7 +136,7 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
-    std::cout << "[+] args: interface=" << interface << " fw=" << fw << " stage1=" << stage1 << " stage2=" << stage2
+    std::cout << "[+] args: interface=" << interface << " fw=" << fw
               << " timeout=" << timeout << " wait-after-pin=" << wait_after_pin << " groom-delay=" << groom_delay
               << " auto-retry=" << (retry ? "on" : "off") << " no-wait-padi=" << (no_wait_padi ? "on" : "off")
               << " real_sleep=" << (real_sleep ? "on" : "off")
@@ -175,25 +148,12 @@ int main(int argc, char *argv[]) {
 
     if (exploit->setFirmwareVersion((FirmwareVersion) offset)) return 1;
     if (exploit->setInterface(interface, buffer_size)) return 1;
-    auto stage1_data = readBinary(stage1);
-    if (stage1_data.empty()) return 1;
-    auto stage2_data = readBinary(stage2);
-    if (stage2_data.empty()) return 1;
-    exploit->setStage1(std::move(stage1_data));
-    exploit->setStage2(std::move(stage2_data));
     exploit->setTimeout(timeout);
     exploit->setWaitPADI(!no_wait_padi);
     exploit->setGroomDelay(groom_delay);
     exploit->setWaitAfterPin(wait_after_pin);
     exploit->setAutoRetry(retry);
     exploit->setRealSleep(real_sleep);
-
-    if (web_page) {
-        web = std::make_shared<WebPage>(exploit);
-        web->setUrl(web_url);
-        web->run();
-        return 0;
-    }
 
     return exploit->run();
 }
