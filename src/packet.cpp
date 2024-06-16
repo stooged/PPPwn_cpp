@@ -32,7 +32,7 @@
 
 const static std::string SOURCE_MAC = "41:41:41:41:41:41";
 const static std::string SOURCE_IPV4 = "192.168.2.1";
-const static std::string SOURCE_IPV6 = "fe80::4141:4141:4141:4141";
+const static std::string SOURCE_IPV6 = "fe80::9f9f:41ff:9f9f:41ff";
 
 const static std::string TARGET_IPV4 = "192.168.2.2";
 
