@@ -100,6 +100,7 @@ int main(int argc, char *argv[]) {
     int wait_after_pin = 1;
     int groom_delay = 4;
     int buffer_size = 0;
+    std::string ipv6_addr = "fe80::9f9f:41ff:9f9f:41ff";
     bool retry = false;
     bool no_wait_padi = false;
     bool real_sleep = false;
@@ -107,6 +108,8 @@ int main(int argc, char *argv[]) {
     auto cli = (
             ("network interface" % required("-i", "--interface") & value("interface", interface), \
             SUPPORTED_FIRMWARE % option("--fw") & integer("fw", fw), \
+            "set the ipv6 source address used (default: fe80::9f9f:41ff:9f9f:41ff)\n" %
+            option("--ipv") & value("fe80::9f9f:41ff:9f9f:41ff", ipv6_addr), \
             "timeout in seconds for ps4 response, 0 means always wait (default: 0)" %
             option("-t", "--timeout") & integer("seconds", timeout), \
             "Waiting time in seconds after the first round CPU pinning (default: 1)" %
@@ -136,7 +139,7 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
-    std::cout << "[+] args: interface=" << interface << " fw=" << fw
+    std::cout << "[+] args: interface=" << interface << " fw=" << fw << " ipv=" << ipv6_addr
               << " timeout=" << timeout << " wait-after-pin=" << wait_after_pin << " groom-delay=" << groom_delay
               << " auto-retry=" << (retry ? "on" : "off") << " no-wait-padi=" << (no_wait_padi ? "on" : "off")
               << " real_sleep=" << (real_sleep ? "on" : "off")
@@ -148,6 +151,7 @@ int main(int argc, char *argv[]) {
 
     if (exploit->setFirmwareVersion((FirmwareVersion) offset)) return 1;
     if (exploit->setInterface(interface, buffer_size)) return 1;
+    exploit->setIpv6(ipv6_addr);
     exploit->setTimeout(timeout);
     exploit->setWaitPADI(!no_wait_padi);
     exploit->setGroomDelay(groom_delay);
