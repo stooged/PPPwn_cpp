@@ -14,20 +14,9 @@
 
 #include "exploit.h"
 
-#define SPRAY_NUM 0x1000
-#define PIN_NUM 0x1000
-#define CORRUPT_NUM 0x1
-
-#define HOLE_START 0x400
-#define HOLE_SPACE 0x10
-
 #define LCP_ID 0x41
 #define IPCP_ID 0x41
-
 #define SESSION_ID 0xffff
-
-#define STAGE2_PORT 9020
-
 #define PPP_IPCP_Option_IP 0x03
 
 
