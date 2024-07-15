@@ -104,12 +104,15 @@ int main(int argc, char *argv[]) {
     bool retry = false;
     bool no_wait_padi = false;
     bool real_sleep = false;
+    bool use_gh = false;
 
     auto cli = (
             ("network interface" % required("-i", "--interface") & value("interface", interface), \
             SUPPORTED_FIRMWARE % option("--fw") & integer("fw", fw), \
             "set the ipv6 source address used (default: fe80::9f9f:41ff:9f9f:41ff)\n" %
             option("--ipv") & value("fe80::9f9f:41ff:9f9f:41ff", ipv6_addr), \
+            "Use GoldHen if available for selected firmware (default: vtx-hen)" %
+            option("-gh", "--use-goldhen").set(use_gh), \
             "timeout in seconds for ps4 response, 0 means always wait (default: 0)" %
             option("-t", "--timeout") & integer("seconds", timeout), \
             "Waiting time in seconds after the first round CPU pinning (default: 1)" %
@@ -139,7 +142,7 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
-    std::cout << "[+] args: interface=" << interface << " fw=" << fw << " ipv=" << ipv6_addr
+    std::cout << "[+] args: interface=" << interface << " fw=" << fw << " ipv=" << ipv6_addr << " gh=" << (use_gh ? "on" : "off")
               << " timeout=" << timeout << " wait-after-pin=" << wait_after_pin << " groom-delay=" << groom_delay
               << " auto-retry=" << (retry ? "on" : "off") << " no-wait-padi=" << (no_wait_padi ? "on" : "off")
               << " real_sleep=" << (real_sleep ? "on" : "off")
@@ -151,6 +154,7 @@ int main(int argc, char *argv[]) {
 
     if (exploit->setFirmwareVersion((FirmwareVersion) offset)) return 1;
     if (exploit->setInterface(interface, buffer_size)) return 1;
+    exploit->setUseGH(fw, use_gh);
     exploit->setIpv6(ipv6_addr);
     exploit->setTimeout(timeout);
     exploit->setWaitPADI(!no_wait_padi);
